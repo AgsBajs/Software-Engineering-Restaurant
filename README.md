@@ -1,3 +1,5 @@
+# This is our Software Engineering Final Project.
+
 ### Installing necessary packages:  
 * `pip install fastapi`
 * `pip install "uvicorn[standard]"`  
