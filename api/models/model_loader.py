@@ -1,11 +1,28 @@
-from . import orders, order_details, recipes, sandwiches, resources
+"""
+Model loader to import all models for SQLAlchemy to recognize them.
+This ensures all tables are created when Base.metadata.create_all() is called.
+"""
 
-from ..dependencies.database import engine
+from models.customer import Customer
+from models.menu_item import MenuItem
+from models.ingredient import Ingredient
+from models.menu_item_ingredient import MenuItemIngredient
+from models.order import Order
+from models.order_item import OrderItem
+from models.promotion import Promotion
+from models.order_promotion import OrderPromotion
+from models.payment import Payment
+from models.review import Review
 
-
-def index():
-    orders.Base.metadata.create_all(engine)
-    order_details.Base.metadata.create_all(engine)
-    recipes.Base.metadata.create_all(engine)
-    sandwiches.Base.metadata.create_all(engine)
-    resources.Base.metadata.create_all(engine)
+__all__ = [
+    "Customer",
+    "MenuItem",
+    "Ingredient",
+    "MenuItemIngredient",
+    "Order",
+    "OrderItem",
+    "Promotion",
+    "OrderPromotion",
+    "Payment",
+    "Review",
+]
