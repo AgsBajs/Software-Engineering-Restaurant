@@ -7,3 +7,4 @@ pytest-mock
 httpx
 cryptography
 sqlalchemy-utils
+email-validator
