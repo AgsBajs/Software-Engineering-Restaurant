@@ -8,3 +8,4 @@ httpx
 cryptography
 sqlalchemy-utils
 email-validator
+cryptography

@@ -16,5 +16,5 @@ class Customer(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    orders = relationship("Order", back_populates="customer")
+    #orders = relationship("Order", back_populates="customer")
     reviews = relationship("Review", back_populates="customer")

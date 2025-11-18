@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
+
 from ..controllers import guest_orders as controller
 from ..schemas import guest_orders as schema
 from ..dependencies.database import get_db
+from ..schemas.guest_orders import GuestOrderCreate, GuestOrder
 
 router = APIRouter(
     tags=["Guest Orders"],
@@ -24,16 +26,8 @@ def create_guest_order(
     return controller.create(db=db, request=request)
 
 
-@router.get(
-    "/{order_id}",
-    response_model=schema.GuestOrder,
-    summary="Get a guest order by ID"
-)
-def get_guest_order(
-    order_id: int,
-    db: Session = Depends(get_db)
-):
-
+@router.get("/{order_id}", response_model=GuestOrder)
+def get_guest_order(order_id: int, db: Session = Depends(get_db)):
     return controller.read_one(db=db, order_id=order_id)
 
 

@@ -1,28 +1,13 @@
-"""
-Model loader to import all models for SQLAlchemy to recognize them.
-This ensures all tables are created when Base.metadata.create_all() is called.
-"""
-
-from .customer import Customer
-from .menu_item import MenuItem
-from .ingredient import Ingredient
-from .menu_item_ingredient import MenuItemIngredient
+from .sandwiches import Sandwich
 from .orders import Order
-from .order_item import OrderItem
-from .promotion import Promotion
-from .order_promotion import OrderPromotion
-from .payment import Payment
-from .review import Review
+from .order_details import OrderDetail
+from .recipes import Recipe
+from .resources import Resource
 
 __all__ = [
-    "Customer",
-    "MenuItem",
-    "Ingredient",
-    "MenuItemIngredient",
+    "Sandwich",
     "Order",
-    "OrderItem",
-    "Promotion",
-    "OrderPromotion",
-    "Payment",
-    "Review",
+    "OrderDetail",
+    "Recipe",
+    "Resource",
 ]

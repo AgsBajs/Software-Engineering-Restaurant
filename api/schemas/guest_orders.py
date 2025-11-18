@@ -1,17 +1,17 @@
 from typing import List, Optional
-from pydantic import BaseModel, EmailStr
-from .order_details import OrderDetail
+from pydantic import BaseModel
 
 
 class GuestOrderItemCreate(BaseModel):
-    sandwich_id: int
-    amount: int
+    menu_item_id: int
+    quantity: int
+    special_requests: Optional[str] = None
 
 
 class GuestOrderBase(BaseModel):
     guest_name: Optional[str] = None
     contact_phone: Optional[str] = None
-    contact_email: Optional[EmailStr] = None
+    contact_email: Optional[str] = None
     table_number: Optional[int] = None
     notes: Optional[str] = None
 
@@ -20,11 +20,26 @@ class GuestOrderCreate(GuestOrderBase):
     items: List[GuestOrderItemCreate]
 
 
+class GuestOrderItem(BaseModel):
+    id: int
+    menu_item_id: int
+    name: str
+    quantity: int
+    unit_price: float
+    subtotal: float
+    special_requests: Optional[str] = None
+
+    class ConfigDict:
+        from_attributes = True
+
+
 class GuestOrder(GuestOrderBase):
     id: int
     code: str
     status: str
-    items: List[OrderDetail]
+    subtotal: float
+    total_price: float
+    items: List[GuestOrderItem]
 
     class ConfigDict:
         from_attributes = True
