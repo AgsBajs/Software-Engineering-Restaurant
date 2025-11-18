@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.orm import Session
 
 from ..controllers import guest_orders as controller
@@ -22,23 +22,22 @@ def create_guest_order(
     request: schema.GuestOrderCreate,
     db: Session = Depends(get_db)
 ):
-
     return controller.create(db=db, request=request)
 
 
-@router.get("/{order_id}", response_model=GuestOrder)
-def get_guest_order(order_id: int, db: Session = Depends(get_db)):
-    return controller.read_one(db=db, order_id=order_id)
-
-
+# 👇 MOVE THIS BLOCK ABOVE "/{order_id}"
 @router.get(
     "/lookup",
     response_model=schema.GuestOrder,
     summary="Lookup a guest order by public code"
 )
 def lookup_guest_order(
-    code: str,
+    code: str = Query(..., min_length=1),
     db: Session = Depends(get_db)
 ):
-
     return controller.lookup_by_code(db=db, code=code)
+
+
+@router.get("/{order_id}", response_model=GuestOrder)
+def get_guest_order(order_id: int, db: Session = Depends(get_db)):
+    return controller.read_one(db=db, order_id=order_id)

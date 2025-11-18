@@ -22,6 +22,72 @@ def _get_sandwiches_by_id(db: Session, ids: List[int]) -> Dict[int, Sandwich]:
     return {s.id: s for s in sandwiches}
 
 
+def _build_guest_order_response(
+    db: Session,
+    order: Order,
+) -> GuestOrder:
+
+    details: List[OrderDetail] = (
+        db.query(OrderDetail)
+        .filter(OrderDetail.order_id == order.id)
+        .all()
+    )
+
+    if not details:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No order details found for order ID {order.id}",
+        )
+
+    sandwich_ids = [d.sandwich_id for d in details]
+    sandwiches_by_id = _get_sandwiches_by_id(db, sandwich_ids)
+
+    response_items: List[GuestOrderItem] = []
+    subtotal = 0.0
+
+    for detail in details:
+        sandwich = sandwiches_by_id.get(detail.sandwich_id)
+        if not sandwich:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Sandwich ID {detail.sandwich_id} referenced in order_details but not found.",
+            )
+
+        unit_price = float(sandwich.price)
+        line_total = unit_price * detail.amount
+        subtotal += line_total
+
+        response_items.append(
+            GuestOrderItem(
+                id=detail.id,
+                menu_item_id=sandwich.id,
+                name=sandwich.sandwich_name,
+                quantity=detail.amount,
+                unit_price=unit_price,
+                subtotal=line_total,
+                # We don't store special_requests in the DB, so return None here.
+                special_requests=None,
+            )
+        )
+
+    total_price = subtotal
+    order_code = f"ORD-{order.id:06d}"
+
+    return GuestOrder(
+        id=order.id,
+        code=order_code,
+        status="pending",
+        subtotal=subtotal,
+        total_price=total_price,
+        items=response_items,
+        guest_name=order.customer_name,
+        contact_phone=None,
+        contact_email=None,
+        table_number=None,
+        notes=order.description,
+    )
+
+
 def create(db: Session, request: GuestOrderCreate) -> GuestOrder:
 
     if not request.items:
@@ -45,7 +111,6 @@ def create(db: Session, request: GuestOrderCreate) -> GuestOrder:
     db.add(order)
     db.flush()
 
-    order_details: List[OrderDetail] = []
     for item in request.items:
         detail = OrderDetail(
             order_id=order.id,
@@ -53,98 +118,30 @@ def create(db: Session, request: GuestOrderCreate) -> GuestOrder:
             amount=item.quantity,
         )
         db.add(detail)
-        order_details.append(detail)
 
     db.commit()
     db.refresh(order)
 
-    response_items: List[GuestOrderItem] = []
-    subtotal = 0.0
+    return _build_guest_order_response(db, order)
 
-    for detail, item_req in zip(order_details, request.items):
-        sandwich = sandwiches_by_id[detail.sandwich_id]
-        unit_price = float(sandwich.price)
-        line_total = unit_price * detail.amount
-        subtotal += line_total
-
-        response_items.append(
-            GuestOrderItem(
-                id=detail.id,
-                menu_item_id=sandwich.id,
-                name=sandwich.sandwich_name,
-                quantity=detail.amount,
-                unit_price=unit_price,
-                subtotal=line_total,
-                special_requests=item_req.special_requests,
-            )
-        )
-
-    total_price = subtotal
-
-    order_code = f"ORD-{order.id:06d}"
-
-    guest_order = GuestOrder(
-        id=order.id,
-        code=order_code,
-        status="pending",
-        subtotal=subtotal,
-        total_price=total_price,
-        items=response_items,
-        guest_name=request.guest_name,
-        contact_phone=request.contact_phone,
-        contact_email=request.contact_email,
-        table_number=request.table_number,
-        notes=request.notes,
-    )
-
-    return guest_order
-
-def _build_guest_order_response(order: Order) -> GuestOrder:
-    items: List[GuestOrderItem] = []
-    subtotal = 0.0
-
-    for detail in order.order_details:
-        sandwich = detail.sandwich
-        if sandwich is None:
-            continue
-
-        unit_price = float(sandwich.price)
-        quantity = detail.amount
-        line_total = unit_price * quantity
-        subtotal += line_total
-
-        items.append(
-            GuestOrderItem(
-                id=detail.id,
-                menu_item_id=sandwich.id,
-                name=sandwich.sandwich_name,
-                quantity=quantity,
-                unit_price=unit_price,
-                subtotal=line_total,
-                special_requests=None,
-            )
-        )
-
-    code = f"ORD-{order.id:06d}"
-    total_price = subtotal
-
-    return GuestOrder(
-        id=order.id,
-        code=code,
-        status="pending",
-        subtotal=subtotal,
-        total_price=total_price,
-        items=items,
-        guest_name=order.customer_name,
-        contact_phone=None,
-        contact_email=None,
-        table_number=None,
-        notes=order.description
-    )
 
 def read_one(db: Session, order_id: int) -> GuestOrder:
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
+        raise HTTPException(status_code=404, detail=f"Order with ID {order_id} not found")
 
-    return _build_guest_order_response(order)
+    return _build_guest_order_response(db, order)
+
+
+def lookup_by_code(db: Session, code: str) -> GuestOrder:
+    prefix = "ORD-"
+    if not code.startswith(prefix):
+        raise HTTPException(status_code=400, detail="Invalid order code format")
+
+    numeric_part = code[len(prefix):]
+
+    if not numeric_part.isdigit():
+        raise HTTPException(status_code=400, detail="Invalid order code format")
+
+    order_id = int(numeric_part)
+    return read_one(db, order_id)
