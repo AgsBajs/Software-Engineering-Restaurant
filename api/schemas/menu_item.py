@@ -1,16 +1,21 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, condecimal
 from typing import Optional
 from datetime import datetime
 
 
 class MenuItemBase(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100)
-    description: Optional[str] = Field(None, max_length=500)
-    price: float = Field(..., gt=0)
-    calories: Optional[int] = Field(None, ge=0)
-    food_category: str = Field(..., min_length=1, max_length=50)
-    is_available: int = Field(default=1, ge=0, le=1)
-    image_url: Optional[str] = Field(None, max_length=255)
+    name: str = Field(..., max_length=100)
+    description: Optional[str] = None
+
+    ingredients_text: Optional[str] = None
+    price: condecimal(max_digits=10, decimal_places=2)
+
+    calories: Optional[int] = None
+    food_category: Optional[str] = Field(None, max_length=50)
+
+    is_vegetarian: bool = False
+    stock_quantity: int = 0
+    is_active: bool = True
 
 
 class MenuItemCreate(MenuItemBase):
@@ -18,19 +23,22 @@ class MenuItemCreate(MenuItemBase):
 
 
 class MenuItemUpdate(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    description: Optional[str] = Field(None, max_length=500)
-    price: Optional[float] = Field(None, gt=0)
-    calories: Optional[int] = Field(None, ge=0)
-    food_category: Optional[str] = Field(None, min_length=1, max_length=50)
-    is_available: Optional[int] = Field(None, ge=0, le=1)
-    image_url: Optional[str] = Field(None, max_length=255)
+    name: Optional[str] = Field(None, max_length=100)
+    description: Optional[str] = None
+
+    ingredients_text: Optional[str] = None
+    price: Optional[condecimal(max_digits=10, decimal_places=2)] = None
+
+    calories: Optional[int] = None
+    food_category: Optional[str] = Field(None, max_length=50)
+
+    is_vegetarian: Optional[bool] = None
+    stock_quantity: Optional[int] = None
+    is_active: Optional[bool] = None
 
 
-class MenuItemResponse(MenuItemBase):
+class MenuItemRead(MenuItemBase):
     id: int
-    created_at: datetime
-    updated_at: Optional[datetime] = None
 
     class Config:
-        from_attributes = True
+        orm_mode = True

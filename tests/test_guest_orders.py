@@ -53,7 +53,7 @@ def db_session():
 @pytest.fixture
 def sample_sandwich(db_session):
     sandwich = Sandwich(
-        sandwich_name="Classic Veggie Sandwich",
+        name="Classic Veggie Sandwich",
         price=7.99
     )
     db_session.add(sandwich)

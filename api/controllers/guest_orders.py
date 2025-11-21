@@ -61,7 +61,7 @@ def _build_guest_order_response(
             GuestOrderItem(
                 id=detail.id,
                 menu_item_id=sandwich.id,
-                name=sandwich.sandwich_name,
+                name=sandwich.name,
                 quantity=detail.amount,
                 unit_price=unit_price,
                 subtotal=line_total,
