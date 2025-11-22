@@ -1,68 +1,115 @@
+from datetime import datetime
+from typing import List, Dict
+
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, status, Response, Depends
-from ..models import orders as model
-from sqlalchemy.exc import SQLAlchemyError
+
+from ..models.orders import Order
+from ..models.order_details import OrderDetail
+from ..models.sandwiches import Sandwich
+from ..schemas.orders import (
+    OrderCreate,
+    OrderResponse,
+    OrderItemCreate,
+)
 
 
-def create(db: Session, request):
-    new_item = model.Order(
-        customer_name=request.customer_name,
-        description=request.description
+TAX_RATE = 0.07
+
+
+def _get_sandwiches_by_id(db: Session, ids: List[int]) -> Dict[int, Sandwich]:
+    if not ids:
+        return {}
+
+    sandwiches = db.query(Sandwich).filter(Sandwich.id.in_(ids)).all()
+    return {s.id: s for s in sandwiches}
+
+
+def create_order(db: Session, order_in: OrderCreate) -> Order:
+    if not order_in.order_items:
+        raise HTTPException(status_code=400, detail="Order must contain at least one item.")
+
+    for item in order_in.order_items:
+        if item.quantity <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid quantity {item.quantity} for menu item {item.menu_item_id}.",
+            )
+
+    sandwich_ids = [item.menu_item_id for item in order_in.order_items]
+    sandwiches_by_id = _get_sandwiches_by_id(db, sandwich_ids)
+
+    missing_ids = set(sandwich_ids) - set(sandwiches_by_id.keys())
+    if missing_ids:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Menu items not found: {sorted(missing_ids)}",
+        )
+
+    subtotal = 0.0
+    order_details: List[OrderDetail] = []
+
+    for item in order_in.order_items:
+        sandwich = sandwiches_by_id[item.menu_item_id]
+        unit_price = float(sandwich.price)
+        line_subtotal = unit_price * item.quantity
+        subtotal += line_subtotal
+
+        detail = OrderDetail(
+            sandwich_id=item.menu_item_id,
+            amount=item.quantity,
+            quantity=item.quantity,
+            unit_price=unit_price,
+            subtotal=line_subtotal,
+            special_requests=item.special_requests,
+        )
+        order_details.append(detail)
+
+    discount_amount = 0.0  # you can later plug in promo logic here
+    tax_amount = round(subtotal * TAX_RATE, 2)
+    total_price = subtotal + tax_amount - discount_amount
+
+    tracking_number = f"TRK-{int(datetime.utcnow().timestamp())}"
+
+    order = Order(
+        customer_id=order_in.customer_id,
+        delivery_address=order_in.delivery_address,
+        special_instructions=order_in.special_instructions,
+        tracking_number=tracking_number,
+        order_status="PLACED",
+        subtotal=subtotal,
+        tax_amount=tax_amount,
+        discount_amount=discount_amount,
+        total_price=total_price,
+        order_date=datetime.utcnow(),
+        estimated_delivery_time=None,
+        actual_delivery_time=None,
+        updated_at=None,
+        promotion_code=order_in.promotion_code,
     )
 
-    try:
-        db.add(new_item)
-        db.commit()
-        db.refresh(new_item)
-    except SQLAlchemyError as e:
-        error = str(e.__dict__['orig'])
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
+    for detail in order_details:
+        detail.order = order
 
-    return new_item
+    db.add(order)
+    db.commit()
+    db.refresh(order)
+    return order
 
 
-def read_all(db: Session):
-    try:
-        result = db.query(model.Order).all()
-    except SQLAlchemyError as e:
-        error = str(e.__dict__['orig'])
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
-    return result
+def get_order(db: Session, order_id: int) -> Order:
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found.")
+    return order
 
 
-def read_one(db: Session, item_id):
-    try:
-        item = db.query(model.Order).filter(model.Order.id == item_id).first()
-        if not item:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Id not found!")
-    except SQLAlchemyError as e:
-        error = str(e.__dict__['orig'])
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
-    return item
+def get_order_by_tracking(db: Session, tracking_number: str) -> Order:
+    order = db.query(Order).filter(Order.tracking_number == tracking_number).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found.")
+    return order
 
 
-def update(db: Session, item_id, request):
-    try:
-        item = db.query(model.Order).filter(model.Order.id == item_id)
-        if not item.first():
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Id not found!")
-        update_data = request.dict(exclude_unset=True)
-        item.update(update_data, synchronize_session=False)
-        db.commit()
-    except SQLAlchemyError as e:
-        error = str(e.__dict__['orig'])
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
-    return item.first()
-
-
-def delete(db: Session, item_id):
-    try:
-        item = db.query(model.Order).filter(model.Order.id == item_id)
-        if not item.first():
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Id not found!")
-        item.delete(synchronize_session=False)
-        db.commit()
-    except SQLAlchemyError as e:
-        error = str(e.__dict__['orig'])
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+def list_orders(db: Session, skip: int = 0, limit: int = 100) -> List[Order]:
+    return db.query(Order).offset(skip).limit(limit).all()
