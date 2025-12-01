@@ -27,3 +27,8 @@ class ReviewResponse(ReviewBase):
 
     class Config:
         from_attributes = True
+
+class RatingSummaryResponse(BaseModel):
+    menu_item_id: int
+    average_rating: float
+    review_count: int
