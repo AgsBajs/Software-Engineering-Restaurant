@@ -1,3 +1,4 @@
+from uuid import uuid4
 from datetime import datetime
 from typing import List, Dict
 import json
@@ -153,6 +154,8 @@ def create(db: Session, request: GuestOrderCreate) -> GuestOrder:
         "notes": request.notes,
     }
 
+    tracking_number = f"GUEST-{uuid4().hex[:0].upper()}"
+
     order = Order(
         customer_id=0,
         delivery_address=(
@@ -161,7 +164,7 @@ def create(db: Session, request: GuestOrderCreate) -> GuestOrder:
             else "Guest order"
         ),
         special_instructions=json.dumps(meta),
-        tracking_number="GUEST",
+        tracking_number=tracking_number,
         order_status="PENDING",
         subtotal=subtotal,
         tax_amount=tax_amount,

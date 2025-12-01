@@ -43,8 +43,8 @@ def get_order_by_tracking(tracking_number: str, db: Session = Depends(get_db)):
 
 @router.get("/staff", response_model=List[OrderResponse], summary="Staff view: list all orders",
             dependencies=[Depends(require_roles(Role.STAFF, Role.ADMIN))])
-def list_staff_orders(db: Session = Depends(get_db)):
-    orders = orders_controller.list_staff_orders(db, skip=0, limit=1000)
+def list_staff_orders(skip: int = Query(0, ge=0), limit: int = Query(1000, ge=1, le=5000), db: Session = Depends(get_db)):
+    orders = orders_controller.list_staff_orders(db, skip=skip, limit=limit)
     return orders
 
 @router.get("/staff/{order_id}", response_model=OrderResponse, summary="Staff view: get any order by ID",
