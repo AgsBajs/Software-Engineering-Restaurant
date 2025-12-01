@@ -16,6 +16,5 @@ class Review(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # Relationships
     customer = relationship("Customer", back_populates="reviews")
     menu_item = relationship("Sandwich", back_populates="reviews")
