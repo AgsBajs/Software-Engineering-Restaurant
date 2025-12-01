@@ -6,6 +6,8 @@ import json
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from ..models.promotion import Promotion
+from .promotion import validate_and_calculate_discount
 from ..models.orders import Order
 from ..models.order_details import OrderDetail
 from ..models.sandwiches import Sandwich
@@ -41,7 +43,7 @@ def _build_guest_order_response(db: Session, order: Order) -> GuestOrder:
     sandwiches_by_id = _get_sandwiches_by_id(db, sandwich_ids)
 
     response_items: List[GuestOrderItem] = []
-    subtotal = 0.0
+    computed_subtotal = 0.0
 
     for detail in details:
         sandwich = sandwiches_by_id.get(detail.sandwich_id)
@@ -54,7 +56,7 @@ def _build_guest_order_response(db: Session, order: Order) -> GuestOrder:
         unit_price = float(sandwich.price)
         quantity = detail.quantity
         line_total = unit_price * quantity
-        subtotal += line_total
+        computed_subtotal += line_total
 
         response_items.append(
             GuestOrderItem(
@@ -68,7 +70,10 @@ def _build_guest_order_response(db: Session, order: Order) -> GuestOrder:
             )
         )
 
-    total_price = subtotal
+    subtotal = float(order.subtotal) if order.subtotal is not None else computed_subtotal
+    tax_amount = float(order.tax_amount) if order.tax_amount is not None else 0.0
+    discount_amount = float(order.discount_amount) if order.discount_amount is not None else 0.0
+    total_price = float(order.total_price) if order.total_price is not None else subtotal + tax_amount - discount_amount
     order_code = f"ORD-{order.id:06d}"
 
     guest_name = None
@@ -100,6 +105,7 @@ def _build_guest_order_response(db: Session, order: Order) -> GuestOrder:
         contact_email=contact_email,
         table_number=table_number,
         notes=notes,
+        promo_code=order.promotion_code,
     )
 
 
@@ -144,6 +150,16 @@ def create(db: Session, request: GuestOrderCreate) -> GuestOrder:
 
     tax_amount = 0.07
     discount_amount = 0.0
+    promo_code_db = None
+
+    if request.promo_code:
+        promo_result = validate_and_calculate_discount(
+            db=db,
+            promo_code=request.promo_code,
+            order_subtotal=subtotal,
+        )
+        discount_amount = promo_result["discount_amount"]
+        promo_code_db = promo_result["promo_code"]
     total_price = subtotal + tax_amount - discount_amount
 
     meta = {
@@ -152,9 +168,10 @@ def create(db: Session, request: GuestOrderCreate) -> GuestOrder:
         "contact_email": request.contact_email,
         "table_number": request.table_number,
         "notes": request.notes,
+        "promo_code": request.promo_code,
     }
 
-    tracking_number = f"GUEST-{uuid4().hex[:0].upper()}"
+    tracking_number = f"GUEST-{uuid4().hex[:8].upper()}"
 
     order = Order(
         customer_id=0,
@@ -174,7 +191,7 @@ def create(db: Session, request: GuestOrderCreate) -> GuestOrder:
         estimated_delivery_time=None,
         actual_delivery_time=None,
         updated_at=None,
-        promotion_code=None,
+        promotion_code=promo_code_db,
     )
 
     for detail in order_details:

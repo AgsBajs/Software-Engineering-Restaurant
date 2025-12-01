@@ -14,10 +14,12 @@ class GuestOrderBase(BaseModel):
     contact_email: Optional[str] = None
     table_number: Optional[int] = None
     notes: Optional[str] = None
+    promo_code: Optional[str] = None
 
 
 class GuestOrderCreate(GuestOrderBase):
     items: List[GuestOrderItemCreate]
+    promo_code: Optional[str] = None
 
 
 class GuestOrderItem(BaseModel):
@@ -40,6 +42,7 @@ class GuestOrder(GuestOrderBase):
     subtotal: float
     total_price: float
     items: List[GuestOrderItem]
+    promo_code: Optional[str] = None
 
     class ConfigDict:
         from_attributes = True
