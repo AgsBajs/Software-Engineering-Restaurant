@@ -113,3 +113,6 @@ def get_order_by_tracking(db: Session, tracking_number: str) -> Order:
 
 def list_orders(db: Session, skip: int = 0, limit: int = 100) -> List[Order]:
     return db.query(Order).offset(skip).limit(limit).all()
+
+def list_staff_orders(db: Session, skip: int = 0, limit: int = 1000) -> List[Order]:
+    return list_orders(db, skip=skip, limit=limit)
